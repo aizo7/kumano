@@ -817,15 +817,32 @@
                 return;
             }
             list.innerHTML = bookmarks.map(spot => `
-                <div class="bookmark-card">
+                <div class="bookmark-card" onclick="openBookmarkSpot(${spot.id})" style="cursor:pointer;">
                     <img src="${spot.photo_url || 'https://via.placeholder.com/52x52?text=No+Image'}" alt="${spot.name}" class="bookmark-photo" onerror="this.src='https://via.placeholder.com/52x52?text=No+Image'">
                     <div class="bookmark-info">
                         <div class="bookmark-name">${spot.name}</div>
                         <div class="bookmark-category">${spot.category}</div>
                     </div>
-                    <button class="bookmark-remove" onclick="removeBookmark(${spot.id})">&#x2715;</button>
+                    <button class="bookmark-remove" onclick="event.stopPropagation(); removeBookmark(${spot.id})">&#x2715;</button>
                 </div>
             `).join('');
+        }
+
+        function openBookmarkSpot(spotId) {
+            const spot = bookmarks.find(b => b.id === spotId);
+            if (!spot) return;
+            // 探索タブに切り替え
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.querySelector('[data-tab="explore-tab"]').classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('explore-tab').classList.add('active');
+            // マップをそのスポットに移動して詳細パネルを開く
+            if (map) {
+                map.panTo({ lat: spot.lat, lng: spot.lng });
+                map.setZoom(16);
+                google.maps.event.trigger(map, 'resize');
+            }
+            setTimeout(() => showDetail(spot), 300);
         }
 
         function removeBookmark(spotId) {
