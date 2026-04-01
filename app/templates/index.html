@@ -2,455 +2,541 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>熊野市ガイド</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
-        body {
+        html, body {
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #FFFFFF;
-            color: #333333;
-            height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            background: #F5F5F7;
+            color: #1D1D1F;
+            height: 100%;
             overflow: hidden;
         }
-        #map {
-            height: 100vh;
-            width: 100vw;
-            position: absolute;
-            top: 0;
+
+        /* ===== タブバー ===== */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
             left: 0;
+            right: 0;
+            height: 64px;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(0,0,0,0.08);
+            z-index: 100;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 6px 12px;
+            cursor: pointer;
+            color: #8E8E93;
+            transition: color 0.2s;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .tab-item.active { color: #1e3a8a; }
+        .tab-icon { font-size: 22px; line-height: 1; }
+        .tab-label { font-size: 10px; font-weight: 600; }
+
+        /* ===== タブコンテンツ ===== */
+        .tab-content {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            bottom: 64px; /* タブバー分 */
+            overflow: hidden;
+        }
+        .tab-content.active { display: flex; flex-direction: column; }
+
+        /* ===== 探索タブ (マップ) ===== */
+        #explore-tab { overflow: visible; }
+        #map {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
             z-index: 1;
         }
         .overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             z-index: 10;
             pointer-events: none;
-        }
-        .search-container {
-            padding: 20px;
-            pointer-events: auto;
+            padding: 12px 16px;
         }
         .search-bar {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 25px;
-            padding: 12px 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid #E5E7EB;
-            backdrop-filter: blur(10px);
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 14px;
+            padding: 12px 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04);
+        }
+        .search-icon {
+            color: #8E8E93;
+            font-size: 16px;
+            flex-shrink: 0;
         }
         .search-bar input {
             border: none;
             outline: none;
             background: transparent;
-            color: #333333;
+            color: #1D1D1F;
             font-size: 16px;
             width: 100%;
         }
-        .search-bar input::placeholder {
-            color: #9CA3AF;
-        }
+        .search-bar input::placeholder { color: #8E8E93; }
         .category-tags {
-            margin-top: 15px;
+            pointer-events: auto;
+            margin-top: 10px;
             display: flex;
-            gap: 8px;
+            gap: 6px;
             overflow-x: auto;
-            padding-bottom: 5px;
+            padding-bottom: 4px;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
+        .category-tags::-webkit-scrollbar { display: none; }
         .category-tag {
-            background: rgba(255, 255, 255, 0.9);
-            color: #374151;
-            border: 1px solid #D1D5DB;
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #1D1D1F;
+            border: 1px solid rgba(0,0,0,0.08);
             border-radius: 20px;
-            padding: 8px 16px;
-            font-size: 14px;
+            padding: 7px 14px;
+            font-size: 13px;
             font-weight: 500;
             white-space: nowrap;
             cursor: pointer;
-            transition: all 0.2s ease;
-            pointer-events: auto;
+            transition: all 0.2s;
         }
         .category-tag.active {
             background: #1e3a8a;
             color: white;
             border-color: #1e3a8a;
         }
-        .category-tag:hover {
-            background: #374151;
-            color: white;
-        }
-        .bottom-sheet {
+
+        /* プレビューカード: 不使用 (非表示) */
+
+        /* ===== 詳細パネル (Google Maps風・左スライド) ===== */
+        .detail-backdrop {
+            display: none;
             position: fixed;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.2);
+            z-index: 19;
+        }
+        .detail-backdrop.show { display: block; }
+        .detail-sheet {
+            position: fixed;
+            top: 0;
             left: 0;
-            right: 0;
+            bottom: 64px;
+            width: 380px;
+            max-width: 85vw;
             background: white;
-            border-radius: 20px 20px 0 0;
-            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 4px 0 20px rgba(0,0,0,0.12);
             z-index: 20;
-            transform: translateY(100%);
-            transition: transform 0.3s ease;
-            max-height: 70vh;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-sheet.show { transform: translateX(0); }
+        .detail-header {
+            padding: 12px 16px 0;
+            flex-shrink: 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+        .detail-close {
+            width: 32px; height: 32px;
+            background: #F2F2F7;
+            border: none;
+            border-radius: 50%;
+            font-size: 16px;
+            color: #8E8E93;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .detail-body {
+            flex: 1;
             overflow-y: auto;
-            pointer-events: auto;
-        }
-        .bottom-sheet.show {
-            transform: translateY(0);
-        }
-        .sheet-handle {
-            width: 40px;
-            height: 4px;
-            background: #D1D5DB;
-            border-radius: 2px;
-            margin: 12px auto;
-        }
-        .sheet-content {
             padding: 0 20px 20px;
+            -webkit-overflow-scrolling: touch;
         }
-        .spot-photo {
+        .detail-photo {
             width: 100%;
             height: 200px;
             object-fit: cover;
             border-radius: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
+            background: #F2F2F7;
         }
-        .spot-name {
+        .detail-name {
             font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #333333;
+            font-weight: 700;
+            margin: 0 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
-        .spot-category {
-            color: #6B7280;
-            font-size: 14px;
+        .badge-heritage {
+            background: linear-gradient(135deg, #F5A623, #F7C948);
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .detail-category {
+            color: #8E8E93;
+            font-size: 13px;
             margin-bottom: 12px;
         }
-        .spot-description {
-            color: #4B5563;
-            margin-bottom: 16px;
-            line-height: 1.5;
-        }
-        .business-hours {
-            background: #F9FAFB;
-            padding: 12px;
-            border-radius: 8px;
+        .detail-description {
+            color: #3A3A3C;
+            font-size: 14px;
+            line-height: 1.6;
             margin-bottom: 16px;
         }
-        .business-hours h6 {
-            margin: 0 0 8px 0;
-            color: #374151;
-            font-size: 16px;
-        }
-        .business-hours p {
-            margin: 0;
-            color: #6B7280;
-        }
-        .recommended-menu {
-            background: #F9FAFB;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .recommended-menu h6 {
-            margin: 0 0 8px 0;
-            color: #374151;
-            font-size: 16px;
-        }
-        .recommended-menu p {
-            margin: 0;
-            color: #6B7280;
-        }
-        .reserve-btn {
-            width: 100%;
-            background: #1e3a8a;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 16px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-        .reserve-btn:hover {
-            background: #1e40af;
-        }
-        .close-sheet {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #6B7280;
-            cursor: pointer;
-            padding: 4px;
-        }
-        /* タブバー */
-        .tab-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-top: 1px solid #E5E7EB;
-            padding: 8px 0;
-            z-index: 100;
+        .detail-row {
             display: flex;
-            justify-content: space-around;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-        }
-        .tab-item {
-            display: flex;
-            flex-direction: column;
             align-items: center;
-            padding: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #9CA3AF;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #F2F2F7;
         }
-        .tab-item.active {
-            color: #1e3a8a;
+        .detail-row:last-of-type { border-bottom: none; }
+        .detail-row-icon {
+            width: 36px; height: 36px;
+            background: #F2F2F7;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
         }
-        .tab-item:hover {
-            color: #1e3a8a;
-        }
-        .tab-icon {
-            font-size: 24px;
-            margin-bottom: 4px;
-        }
-        .tab-label {
+        .detail-row-content { flex: 1; }
+        .detail-row-label {
             font-size: 12px;
+            color: #8E8E93;
+        }
+        .detail-row-value {
+            font-size: 14px;
+            color: #1D1D1F;
             font-weight: 500;
         }
-        /* タブコンテンツ */
-        .tab-content {
-            display: none;
-            height: 100vh;
-            position: relative;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        /* ガイドタブ */
-        .chat-container {
-            height: 100vh;
+        .detail-actions {
             display: flex;
-            flex-direction: column;
-            background: #FFFFFF;
+            gap: 10px;
+            margin-top: 20px;
+            padding-bottom: 24px;
         }
-        .chat-header {
-            padding: 20px;
-            background: white;
-            border-bottom: 1px solid #E5E7EB;
-            text-align: center;
+        .btn-action {
+            flex: 1;
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 14px;
             font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
+        .btn-action:active { opacity: 0.7; }
+        .btn-action.primary { background: #1e3a8a; color: white; }
+        .btn-action.secondary { background: #F2F2F7; color: #1D1D1F; }
+        .btn-action.bookmark-active { background: #FFF3E0; color: #E65100; }
+
+        /* ===== ページヘッダー (共通) ===== */
+        .page-header {
+            padding: 16px 20px 12px;
+            background: white;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            flex-shrink: 0;
+        }
+        .page-header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        /* ===== ガイド (チャット) タブ ===== */
         .chat-messages {
             flex: 1;
-            padding: 20px;
+            padding: 16px 20px;
             overflow-y: auto;
-            background: #F9FAFB;
+            background: #F5F5F7;
+            -webkit-overflow-scrolling: touch;
         }
         .message {
-            margin-bottom: 16px;
-            padding: 12px 16px;
-            border-radius: 16px;
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            border-radius: 18px;
             max-width: 80%;
+            font-size: 15px;
+            line-height: 1.45;
+            word-break: break-word;
         }
         .message.user {
             background: #1e3a8a;
             color: white;
             margin-left: auto;
+            border-bottom-right-radius: 6px;
         }
         .message.ai {
             background: white;
-            color: #333333;
-            border: 1px solid #E5E7EB;
+            color: #1D1D1F;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         }
-        .chat-input-container {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #E5E7EB;
-        }
-        .chat-input {
+        .chat-input-bar {
             display: flex;
-            gap: 12px;
-        }
-        .chat-input input {
-            flex: 1;
+            gap: 10px;
             padding: 12px 16px;
-            border: 1px solid #E5E7EB;
-            border-radius: 24px;
-            outline: none;
+            background: white;
+            border-top: 1px solid rgba(0,0,0,0.06);
+            flex-shrink: 0;
         }
-        .chat-input button {
-            padding: 12px 20px;
+        .chat-input-bar input {
+            flex: 1;
+            padding: 10px 16px;
+            border: 1px solid #E5E5EA;
+            border-radius: 22px;
+            outline: none;
+            font-size: 15px;
+            background: #F9F9FB;
+        }
+        .chat-input-bar input:focus { border-color: #1e3a8a; background: white; }
+        .chat-send-btn {
+            width: 40px; height: 40px;
             background: #1e3a8a;
             color: white;
             border: none;
-            border-radius: 24px;
+            border-radius: 50%;
+            font-size: 18px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: opacity 0.2s;
         }
-        /* ライブタブ */
-        .live-container {
-            height: 100vh;
-            background: #FFFFFF;
-            padding: 20px;
+        .chat-send-btn:active { opacity: 0.7; }
+
+        /* ===== ライブタブ ===== */
+        .page-scroll {
+            flex: 1;
             overflow-y: auto;
-        }
-        .live-header {
-            text-align: center;
-            margin-bottom: 20px;
-            font-weight: 600;
+            padding: 16px 20px;
+            -webkit-overflow-scrolling: touch;
         }
         .event-card {
             background: white;
-            border: 1px solid #E5E7EB;
-            border-radius: 12px;
+            border-radius: 14px;
             padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
+        .event-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .event-icon.firework { background: #FFF3E0; }
+        .event-icon.parking { background: #E8F5E9; }
+        .event-icon.traffic { background: #FBE9E7; }
+        .event-info { flex: 1; }
         .event-title {
             font-weight: 600;
-            margin-bottom: 8px;
+            font-size: 15px;
+            margin-bottom: 2px;
         }
         .event-time {
-            color: #6B7280;
-            font-size: 14px;
-            margin-bottom: 8px;
+            color: #8E8E93;
+            font-size: 13px;
         }
-        .event-status {
-            color: #1e3a8a;
-            font-weight: 500;
-        }
-        /* しおりタブ */
-        .bookmarks-container {
-            height: 100vh;
-            background: #FFFFFF;
-            padding: 20px;
-            overflow-y: auto;
-        }
-        .bookmarks-header {
-            text-align: center;
-            margin-bottom: 20px;
+        .event-badge {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
             font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
+        .event-badge.live { background: #E8F5E9; color: #2E7D32; }
+        .event-badge.full { background: #FBE9E7; color: #D32F2F; }
+        .event-badge.warning { background: #FFF3E0; color: #E65100; }
+
+        /* ===== しおりタブ ===== */
         .bookmark-card {
             background: white;
-            border: 1px solid #E5E7EB;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
             display: flex;
             align-items: center;
             gap: 12px;
         }
         .bookmark-photo {
-            width: 60px;
-            height: 60px;
+            width: 52px; height: 52px;
             object-fit: cover;
-            border-radius: 8px;
+            border-radius: 10px;
+            background: #F2F2F7;
+            flex-shrink: 0;
         }
-        .bookmark-info {
-            flex: 1;
-        }
+        .bookmark-info { flex: 1; min-width: 0; }
         .bookmark-name {
             font-weight: 600;
-            margin-bottom: 4px;
+            font-size: 15px;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .bookmark-category {
-            color: #6B7280;
-            font-size: 14px;
+            color: #8E8E93;
+            font-size: 13px;
         }
+        .bookmark-remove {
+            width: 30px; height: 30px;
+            background: #F2F2F7;
+            border: none;
+            border-radius: 50%;
+            font-size: 14px;
+            color: #8E8E93;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8E8E93;
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state-text { font-size: 15px; }
     </style>
 </head>
 <body>
     <!-- 探索タブ -->
     <div id="explore-tab" class="tab-content active">
         <div id="map"></div>
-
         <div class="overlay">
-            <div class="search-container">
-                <div class="search-bar">
-                    <input type="text" id="searchInput" placeholder="スポットを検索...">
-                </div>
-                <div class="category-tags">
-                    <button class="category-tag active" data-category="">すべて</button>
-                    <button class="category-tag" data-category="コンビニ">コンビニ</button>
-                    <button class="category-tag" data-category="ホテル">ホテル</button>
-                    <button class="category-tag" data-category="飲食店">飲食店</button>
-                    <button class="category-tag" data-category="駅">駅</button>
-                    <button class="category-tag" data-category="観光施設">観光施設</button>
-                    <button class="category-tag" data-category="トイレ">トイレ</button>
-                    <button class="category-tag" data-category="駐車場">駐車場</button>
-                    <button class="category-tag" data-category="雑貨屋">雑貨屋</button>
-                </div>
+            <div class="search-bar">
+                <span class="search-icon">&#128269;</span>
+                <input type="text" id="searchInput" placeholder="スポットを検索...">
+            </div>
+            <div class="category-tags">
+                <button class="category-tag active" data-category="">すべて</button>
+                <button class="category-tag" data-category="飲食店">飲食店</button>
+                <button class="category-tag" data-category="ホテル">ホテル</button>
+                <button class="category-tag" data-category="駐車場">駐車場</button>
+                <button class="category-tag" data-category="コンビニ">コンビニ</button>
+                <button class="category-tag" data-category="観光施設">観光施設</button>
+                <button class="category-tag" data-category="駅">駅</button>
+                <button class="category-tag" data-category="トイレ">トイレ</button>
+                <button class="category-tag" data-category="雑貨屋">雑貨屋</button>
             </div>
         </div>
 
-        <div id="bottomSheet" class="bottom-sheet">
-            <div class="sheet-handle"></div>
-            <button class="close-sheet" onclick="closeBottomSheet()">&times;</button>
-            <div class="sheet-content" id="sheetContent">
-                <!-- 店舗詳細がここに動的に挿入 -->
+        <!-- 詳細パネル -->
+        <div id="detailBackdrop" class="detail-backdrop" onclick="closeDetail()"></div>
+        <div id="detailSheet" class="detail-sheet">
+            <div class="detail-header">
+                <button class="detail-close" onclick="closeDetail()">&#x2715;</button>
             </div>
+            <div class="detail-body" id="detailContent"></div>
         </div>
     </div>
 
     <!-- ガイドタブ -->
     <div id="guide-tab" class="tab-content">
-        <div class="chat-container">
-            <div class="chat-header">AIガイド</div>
-            <div class="chat-messages" id="chatMessages">
-                <div class="message ai">こんにちは！熊野市の観光についてお手伝いします。何か知りたいことはありますか？</div>
-            </div>
-            <div class="chat-input-container">
-                <div class="chat-input">
-                    <input type="text" id="chatInput" placeholder="メッセージを入力...">
-                    <button onclick="sendMessage()">送信</button>
-                </div>
-            </div>
+        <div class="page-header"><h1>AIガイド</h1></div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message ai">こんにちは! 熊野市の観光についてお手伝いします。何か知りたいことはありますか?</div>
+        </div>
+        <div class="chat-input-bar">
+            <input type="text" id="chatInput" placeholder="メッセージを入力...">
+            <button class="chat-send-btn" onclick="sendMessage()">&#9654;</button>
         </div>
     </div>
 
     <!-- ライブタブ -->
     <div id="live-tab" class="tab-content">
-        <div class="live-container">
-            <div class="live-header">リアルタイム情報</div>
+        <div class="page-header"><h1>リアルタイム情報</h1></div>
+        <div class="page-scroll">
             <div class="event-card">
-                <div class="event-title">熊野市花火大会</div>
-                <div class="event-time">19:00 - 20:30</div>
-                <div class="event-status">開催中</div>
+                <div class="event-icon firework">&#127878;</div>
+                <div class="event-info">
+                    <div class="event-title">熊野市花火大会</div>
+                    <div class="event-time">19:00 - 20:30</div>
+                </div>
+                <span class="event-badge live">開催中</span>
             </div>
             <div class="event-card">
-                <div class="event-title">中央駐車場</div>
-                <div class="event-time">現在</div>
-                <div class="event-status">満車 (残り0台)</div>
+                <div class="event-icon parking">&#127359;</div>
+                <div class="event-info">
+                    <div class="event-title">中央駐車場</div>
+                    <div class="event-time">現在の状況</div>
+                </div>
+                <span class="event-badge full">満車</span>
             </div>
             <div class="event-card">
-                <div class="event-title">交通規制</div>
-                <div class="event-time">18:00 - 22:00</div>
-                <div class="event-status">国道42号線周辺規制中</div>
+                <div class="event-icon traffic">&#128679;</div>
+                <div class="event-info">
+                    <div class="event-title">交通規制</div>
+                    <div class="event-time">18:00 - 22:00</div>
+                </div>
+                <span class="event-badge warning">規制中</span>
             </div>
         </div>
     </div>
 
     <!-- しおりタブ -->
     <div id="bookmarks-tab" class="tab-content">
-        <div class="bookmarks-container">
-            <div class="bookmarks-header">保存済みスポット</div>
-            <div id="bookmarksList">
-                <!-- 動的に追加 -->
+        <div class="page-header"><h1>しおり</h1></div>
+        <div class="page-scroll" id="bookmarksList">
+            <div class="empty-state">
+                <div class="empty-state-icon">&#128278;</div>
+                <div class="empty-state-text">保存したスポットがありません</div>
             </div>
         </div>
     </div>
@@ -458,77 +544,63 @@
     <!-- タブバー -->
     <div class="tab-bar">
         <div class="tab-item active" data-tab="explore-tab">
-            <div class="tab-icon">🗺️</div>
+            <div class="tab-icon">&#128506;</div>
             <div class="tab-label">探索</div>
         </div>
         <div class="tab-item" data-tab="guide-tab">
-            <div class="tab-icon">💬</div>
+            <div class="tab-icon">&#128172;</div>
             <div class="tab-label">ガイド</div>
         </div>
         <div class="tab-item" data-tab="live-tab">
-            <div class="tab-icon">📡</div>
+            <div class="tab-icon">&#128225;</div>
             <div class="tab-label">ライブ</div>
         </div>
         <div class="tab-item" data-tab="bookmarks-tab">
-            <div class="tab-icon">📚</div>
+            <div class="tab-icon">&#128278;</div>
             <div class="tab-label">しおり</div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let map;
         let markers = [];
         let allSpots = [];
+        let placesSpots = [];
         let currentCategory = '';
-        let bookmarks = JSON.parse(localStorage.getItem('bookmarks') || '[]');
+        let bookmarks = JSON.parse(localStorage.getItem('kumano_bookmarks') || '[]');
 
-        // タブ切り替え
+        // --- タブ切り替え ---
         document.querySelectorAll('.tab-item').forEach(item => {
             item.addEventListener('click', function() {
                 const tabId = this.dataset.tab;
-                
-                // アクティブタブ変更
                 document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
                 this.classList.add('active');
-                
-                // コンテンツ切り替え
-                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 document.getElementById(tabId).classList.add('active');
-                
-                // マップ初期化（探索タブの場合）
-                if (tabId === 'explore-tab' && !map) {
-                    initMap();
+                if (tabId === 'explore-tab' && map) {
+                    google.maps.event.trigger(map, 'resize');
                 }
-                
-                // しおり更新
-                if (tabId === 'bookmarks-tab') {
-                    updateBookmarks();
-                }
+                if (tabId === 'bookmarks-tab') updateBookmarks();
             });
         });
 
-        // Google Maps API callback関数
+        // --- Google Maps ---
         window.initMap = function() {
-            console.log('initMap called');
-            const kumano = { lat: 33.8895, lng: 136.0997 }; // 熊野市駅周辺
+            const kumano = { lat: 33.8895, lng: 136.0997 };
             map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 15, // 街の店舗が見やすいズームレベル
+                zoom: 15,
                 center: kumano,
                 disableDefaultUI: true,
+                zoomControl: true,
+                zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
                 styles: [
-                    {
-                        featureType: "poi",
-                        elementType: "labels",
-                        stylers: [{ visibility: "off" }]
-                    }
+                    { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
                 ]
             });
-            console.log('Map created:', map);
-            
             loadSpots();
-            
-            // カテゴリータグイベント
+
+            map.addListener('click', () => closeDetail());
+
             document.querySelectorAll('.category-tag').forEach(tag => {
                 tag.addEventListener('click', function() {
                     document.querySelectorAll('.category-tag').forEach(t => t.classList.remove('active'));
@@ -537,57 +609,99 @@
                     filterSpots();
                 });
             });
-            
-            // 検索イベント
             document.getElementById('searchInput').addEventListener('input', filterSpots);
-        }
+        };
 
         async function loadSpots() {
-            console.log('loadSpots called');
             try {
                 const response = await fetch('/api/spots');
-                console.log('API response:', response);
                 allSpots = await response.json();
-                console.log('Loaded spots:', allSpots);
-                displaySpots(allSpots);
+                await loadPlacesSpots();
+                displaySpots(getAllSpots());
             } catch (error) {
-                console.error('スポットデータの読み込みに失敗しました:', error);
+                console.error('スポットデータの読み込みに失敗:', error);
             }
         }
 
-        function displaySpots(spots) {
-            console.log('表示するスポット数:', spots.length);
-            console.log('スポットデータ:', spots);
-            // 既存マーカーをクリア
-            markers.forEach(marker => marker.setMap(null));
-            markers = [];
+        function getAllSpots() {
+            return [...allSpots, ...placesSpots];
+        }
 
+        async function loadPlacesSpots() {
+            const service = new google.maps.places.PlacesService(map);
+            const kumanoCenter = new google.maps.LatLng(33.8895, 136.0997);
+            const placeTypes = [
+                { type: 'restaurant', category: '飲食店' },
+                { type: 'lodging', category: 'ホテル' },
+                { type: 'parking', category: '駐車場' }
+            ];
+            placesSpots = [];
+            let nextId = 10000;
+
+            for (const pt of placeTypes) {
+                const results = await searchNearby(service, { location: kumanoCenter, radius: 5000, type: pt.type });
+                results.forEach(place => {
+                    const isDuplicate = allSpots.some(s => {
+                        const dist = getDistance(s.lat, s.lng, place.geometry.location.lat(), place.geometry.location.lng());
+                        return dist < 50 && s.name.includes(place.name.substring(0, 4));
+                    });
+                    if (!isDuplicate) {
+                        placesSpots.push({
+                            id: nextId++,
+                            name: place.name,
+                            category: pt.category,
+                            lat: place.geometry.location.lat(),
+                            lng: place.geometry.location.lng(),
+                            description: place.vicinity || '',
+                            photo_url: (place.photos && place.photos.length > 0) ? place.photos[0].getUrl({ maxWidth: 400 }) : '',
+                            open_time: '',
+                            close_time: '',
+                            recommended_menu: '',
+                            reservation_url: '',
+                            is_world_heritage: false,
+                            _from_places: true,
+                            rating: place.rating || null,
+                            user_ratings_total: place.user_ratings_total || 0
+                        });
+                    }
+                });
+            }
+        }
+
+        function searchNearby(service, request) {
+            return new Promise(resolve => {
+                service.nearbySearch(request, (results, status) => {
+                    resolve(status === google.maps.places.PlacesServiceStatus.OK ? results : []);
+                });
+            });
+        }
+
+        function getDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // --- マーカー表示 ---
+        function displaySpots(spots) {
+            markers.forEach(m => m.setMap(null));
+            markers = [];
             spots.forEach(spot => {
-                console.log('マーカー作成:', spot.name, spot.category, spot.is_world_heritage);
-                
-                // 通常のMarkerを使って絵文字を表示
                 const marker = new google.maps.Marker({
                     position: { lat: spot.lat, lng: spot.lng },
                     map: map,
                     title: spot.name,
                     icon: createMarkerIcon(spot)
                 });
-
-                marker.addListener('click', () => {
-                    showBottomSheet(spot);
-                });
-
+                marker.addListener('click', () => showDetail(spot));
                 markers.push(marker);
             });
-            console.log('作成したマーカー数:', markers.length);
         }
-
-
 
         function createMarkerIcon(spot) {
             const emoji = getCategoryEmoji(spot.category, spot.is_world_heritage);
-            
-            // 絵文字をSVGとして表示
             return {
                 url: `data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><text x="20" y="28" font-size="24" text-anchor="middle">${emoji}</text></svg>`,
                 scaledSize: new google.maps.Size(40, 40),
@@ -595,167 +709,189 @@
             };
         }
 
-        function getCategoryEmoji(category, isWorldHeritage = false) {
-            if (isWorldHeritage) {
-                return '🏛️'; // 世界遺産は城の絵文字
-            }
-            
+        function getCategoryEmoji(category, isWorldHeritage) {
+            if (isWorldHeritage) return '%F0%9F%8F%9B%EF%B8%8F';
             const icons = {
-                'コンビニ': '🛒',
-                'ホテル': '🏨',
-                '飲食店': '🍽️',
-                'トイレ': '🚻',
-                '駐車場': '🅿️',
-                '雑貨屋': '🛍️',
-                '神社': '⛩️',
-                '史跡': '🏛️',
-                '駅': '🚉',
-                '観光施設': '🏞️'
+                'コンビニ': '%F0%9F%9B%92', 'ホテル': '%F0%9F%8F%A8', '飲食店': '%F0%9F%8D%BD%EF%B8%8F',
+                'トイレ': '%F0%9F%9A%BB', '駐車場': '%F0%9F%85%BF%EF%B8%8F', '雑貨屋': '%F0%9F%9B%8D%EF%B8%8F',
+                '神社': '%E2%9B%A9%EF%B8%8F', '史跡': '%F0%9F%8F%9B%EF%B8%8F', '駅': '%F0%9F%9A%89',
+                '観光施設': '%F0%9F%8F%9E%EF%B8%8F'
             };
-            
-            return icons[category] || '📍';
+            return icons[category] || '%F0%9F%93%8D';
         }
 
         function filterSpots() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
-            const filteredSpots = allSpots.filter(spot => {
-                const matchesCategory = !currentCategory || spot.category === currentCategory;
-                const matchesSearch = !searchTerm || 
-                    spot.name.toLowerCase().includes(searchTerm) || 
-                    spot.description.toLowerCase().includes(searchTerm);
-                return matchesCategory && matchesSearch;
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = getAllSpots().filter(spot => {
+                const matchCat = !currentCategory || spot.category === currentCategory;
+                const matchSearch = !term || spot.name.toLowerCase().includes(term) || (spot.description && spot.description.toLowerCase().includes(term));
+                return matchCat && matchSearch;
             });
-            
-            displaySpots(filteredSpots);
+            displaySpots(filtered);
         }
 
-        function showBottomSheet(spot) {
-            const photo = spot.photo_url || 'https://via.placeholder.com/400x200?text=写真なし';
-            const openTime = spot.open_time || '未定';
-            const closeTime = spot.close_time || '未定';
-            const recommendedMenu = spot.recommended_menu || 'お問い合わせください';
-            const reservationUrl = spot.reservation_url || '#';
-            const worldHeritageBadge = spot.is_world_heritage ? '<span style="background: gold; color: #333; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: 8px;">世界遺産</span>' : '';
+        // --- 詳細パネル (Google Maps風・左スライド) ---
+        let selectedSpot = null;
 
-            const content = `
-                <img src="${photo}" alt="${spot.name}写真" class="spot-photo">
-                <h2 class="spot-name">${spot.name}${worldHeritageBadge}</h2>
-                <p class="spot-category">${spot.category}</p>
-                <p class="spot-description">${spot.description}</p>
-                
-                <div class="business-hours">
-                    <h6>営業時間</h6>
-                    <p>${openTime} - ${closeTime}</p>
-                </div>
-                
-                <div class="recommended-menu">
-                    <h6>おすすめメニュー</h6>
-                    <p>${recommendedMenu}</p>
-                </div>
-                
-                <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-                    <button class="reserve-btn" style="flex: 1;" onclick="window.open('${reservationUrl}', '_blank')">
-                        予約・詳細を見る
-                    </button>
-                    <button class="reserve-btn" style="flex: 1; background: #6B7280;" onclick="addToBookmarks(${spot.id})">
-                        しおりに保存
-                    </button>
-                </div>
-            `;
-            
-            document.getElementById('sheetContent').innerHTML = content;
-            document.getElementById('bottomSheet').classList.add('show');
-        }
+        function showDetail(spot) {
+            selectedSpot = spot;
 
-        function closeBottomSheet() {
-            document.getElementById('bottomSheet').classList.remove('show');
-        }
+            const photo = spot.photo_url;
+            const hasHours = spot.open_time && spot.close_time;
+            const hasMenu = spot.recommended_menu;
+            const hasUrl = spot.reservation_url;
+            const isBookmarked = bookmarks.some(b => b.id === spot.id);
 
-        // ボトムシート外クリックで閉じる
-        document.addEventListener('click', function(event) {
-            const bottomSheet = document.getElementById('bottomSheet');
-            if (event.target === bottomSheet) {
-                closeBottomSheet();
+            let html = '';
+            if (photo) {
+                html += `<img src="${photo}" alt="${spot.name}" class="detail-photo" onerror="this.style.display='none'">`;
             }
-        });
+            html += `<h2 class="detail-name">${spot.name}`;
+            if (spot.is_world_heritage) html += `<span class="badge-heritage">世界遺産</span>`;
+            html += `</h2>`;
+            html += `<div class="detail-category">${spot.category}</div>`;
+            if (spot.description) html += `<div class="detail-description">${spot.description}</div>`;
 
-        // チャット機能
-        function sendMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
-            
-            // ユーザーメッセージ追加
-            addMessage(message, 'user');
-            input.value = '';
-            
-            // AI応答（シミュレーション）
-            setTimeout(() => {
-                const aiResponse = getAIResponse(message);
-                addMessage(aiResponse, 'ai');
-            }, 1000);
+            if (spot.rating) {
+                html += `<div class="detail-row">
+                    <div class="detail-row-icon">&#9733;</div>
+                    <div class="detail-row-content">
+                        <div class="detail-row-label">評価</div>
+                        <div class="detail-row-value">${spot.rating} / 5.0 (${spot.user_ratings_total}件のクチコミ)</div>
+                    </div>
+                </div>`;
+            }
+            if (hasHours) {
+                html += `<div class="detail-row">
+                    <div class="detail-row-icon">&#128339;</div>
+                    <div class="detail-row-content">
+                        <div class="detail-row-label">営業時間</div>
+                        <div class="detail-row-value">${spot.open_time} - ${spot.close_time}</div>
+                    </div>
+                </div>`;
+            }
+            if (hasMenu) {
+                html += `<div class="detail-row">
+                    <div class="detail-row-icon">&#127860;</div>
+                    <div class="detail-row-content">
+                        <div class="detail-row-label">おすすめ</div>
+                        <div class="detail-row-value">${spot.recommended_menu}</div>
+                    </div>
+                </div>`;
+            }
+            if (spot.description && spot.description.includes('、')) {
+                html += `<div class="detail-row">
+                    <div class="detail-row-icon">&#128205;</div>
+                    <div class="detail-row-content">
+                        <div class="detail-row-label">住所</div>
+                        <div class="detail-row-value">${spot.description}</div>
+                    </div>
+                </div>`;
+            }
+
+            html += `<div class="detail-actions">`;
+            if (hasUrl) {
+                html += `<button class="btn-action primary" onclick="window.open('${spot.reservation_url}','_blank')">&#128279; 予約・詳細</button>`;
+            }
+            html += `<button class="btn-action ${isBookmarked ? 'bookmark-active' : 'secondary'}" id="bookmarkBtn" onclick="toggleBookmark(${spot.id})">
+                ${isBookmarked ? '&#128278; 保存済み' : '&#128278; 保存'}
+            </button>`;
+            html += `</div>`;
+
+            document.getElementById('detailContent').innerHTML = html;
+            document.getElementById('detailSheet').classList.add('show');
+            document.getElementById('detailBackdrop').classList.add('show');
         }
 
-        function addMessage(text, type) {
-            const messages = document.getElementById('chatMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = text;
-            messages.appendChild(messageDiv);
-            messages.scrollTop = messages.scrollHeight;
+        function closeDetail() {
+            document.getElementById('detailSheet').classList.remove('show');
+            document.getElementById('detailBackdrop').classList.remove('show');
         }
 
-        function getAIResponse(message) {
-            // シンプルな応答ロジック
-            if (message.includes('花火')) {
-                return '熊野市の花火大会は毎年8月に開催されます。素晴らしい眺望が楽しめますよ！';
-            } else if (message.includes('ホテル')) {
-                return 'おすすめのホテルは「熊野ホテル」です。花火が見える部屋もあります。';
-            } else if (message.includes('飲食店')) {
-                return '「海鮮レストラン」が人気です。新鮮な海の幸をぜひ！';
+        function getCategoryEmojiRaw(category, isWorldHeritage) {
+            if (isWorldHeritage) return '&#127963;&#65039;';
+            const icons = {
+                'コンビニ': '&#128722;', 'ホテル': '&#127976;', '飲食店': '&#127869;&#65039;',
+                'トイレ': '&#128699;', '駐車場': '&#127359;&#65039;', '雑貨屋': '&#128717;&#65039;',
+                '神社': '&#9961;&#65039;', '史跡': '&#127963;&#65039;', '駅': '&#128649;',
+                '観光施設': '&#127966;&#65039;'
+            };
+            return icons[category] || '&#128205;';
+        }
+
+        // --- しおり機能 ---
+        function toggleBookmark(spotId) {
+            const idx = bookmarks.findIndex(b => b.id === spotId);
+            if (idx >= 0) {
+                bookmarks.splice(idx, 1);
             } else {
-                return '熊野市についてもっと詳しく教えてください。何をお手伝いしましょうか？';
+                const spot = getAllSpots().find(s => s.id === spotId);
+                if (spot) bookmarks.push(spot);
             }
-        }
-
-        // Enterキーで送信
-        document.getElementById('chatInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-
-        // しおり機能
-        function addToBookmarks(spotId) {
-            const spot = allSpots.find(s => s.id === spotId);
-            if (spot && !bookmarks.find(b => b.id === spotId)) {
-                bookmarks.push(spot);
-                localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
-                alert('しおりに保存しました！');
-            } else {
-                alert('すでに保存されています。');
+            localStorage.setItem('kumano_bookmarks', JSON.stringify(bookmarks));
+            const isBookmarked = bookmarks.some(b => b.id === spotId);
+            const btn = document.getElementById('bookmarkBtn');
+            if (btn) {
+                btn.innerHTML = isBookmarked ? '&#128278; 保存済み' : '&#128278; 保存';
+                btn.className = `btn-action ${isBookmarked ? 'bookmark-active' : 'secondary'}`;
             }
         }
 
         function updateBookmarks() {
             const list = document.getElementById('bookmarksList');
+            if (bookmarks.length === 0) {
+                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128278;</div><div class="empty-state-text">保存したスポットがありません</div></div>';
+                return;
+            }
             list.innerHTML = bookmarks.map(spot => `
                 <div class="bookmark-card">
-                    <img src="${spot.photo_url || 'https://via.placeholder.com/60x60?text=写真'}" alt="${spot.name}" class="bookmark-photo">
+                    <img src="${spot.photo_url || 'https://via.placeholder.com/52x52?text=No+Image'}" alt="${spot.name}" class="bookmark-photo" onerror="this.src='https://via.placeholder.com/52x52?text=No+Image'">
                     <div class="bookmark-info">
                         <div class="bookmark-name">${spot.name}</div>
                         <div class="bookmark-category">${spot.category}</div>
                     </div>
+                    <button class="bookmark-remove" onclick="removeBookmark(${spot.id})">&#x2715;</button>
                 </div>
             `).join('');
         }
 
-        // ページロード時の初期化
-        document.addEventListener('DOMContentLoaded', function() {
-            // Google Maps APIがロードされたらinitMapが呼ばれるので、ここでは何もしない
+        function removeBookmark(spotId) {
+            bookmarks = bookmarks.filter(b => b.id !== spotId);
+            localStorage.setItem('kumano_bookmarks', JSON.stringify(bookmarks));
+            updateBookmarks();
+        }
+
+        // --- チャット ---
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+            addMessage(message, 'user');
+            input.value = '';
+            setTimeout(() => addMessage(getAIResponse(message), 'ai'), 800);
+        }
+
+        function addMessage(text, type) {
+            const messages = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = text;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function getAIResponse(msg) {
+            if (msg.includes('花火')) return '熊野市の花火大会は毎年8月に開催されます。素晴らしい眺望が楽しめますよ!';
+            if (msg.includes('ホテル')) return 'おすすめのホテルは「熊野ホテル」です。花火が見える部屋もあります。';
+            if (msg.includes('飲食店') || msg.includes('ご飯') || msg.includes('ランチ')) return '「海鮮レストラン」が人気です。新鮮な海の幸をぜひ!';
+            if (msg.includes('駐車場')) return '熊野市駅前駐車場が便利です。花火大会当日は早めの確保をおすすめします。';
+            return '熊野市についてもっと詳しく教えてください。何をお手伝いしましょうか?';
+        }
+
+        document.getElementById('chatInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') sendMessage();
         });
     </script>
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&callback=initMap"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&libraries=places&callback=initMap"></script>
 </body>
 </html>
