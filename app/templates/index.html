@@ -472,6 +472,7 @@
                 <button class="category-tag" data-category="コンビニ">コンビニ</button>
                 <button class="category-tag" data-category="観光スポット">観光スポット</button>
                 <button class="category-tag" data-category="駅">駅</button>
+                <button class="category-tag" data-category="__bookmark__">&#128278; しおり</button>
             </div>
         </div>
 
@@ -715,8 +716,10 @@
 
         function filterSpots() {
             const term = document.getElementById('searchInput').value.toLowerCase();
+            const isBookmarkFilter = currentCategory === '__bookmark__';
+            const bookmarkIds = new Set(bookmarks.map(b => b.id));
             const filtered = allSpots.filter(spot => {
-                const matchCat = !currentCategory || spot.category === currentCategory;
+                const matchCat = !currentCategory || (isBookmarkFilter ? bookmarkIds.has(spot.id) : spot.category === currentCategory);
                 const matchSearch = !term || spot.name.toLowerCase().includes(term) || (spot.description && spot.description.toLowerCase().includes(term));
                 return matchCat && matchSearch;
             });
