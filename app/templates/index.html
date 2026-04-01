@@ -470,10 +470,8 @@
                 <button class="category-tag" data-category="ホテル">ホテル</button>
                 <button class="category-tag" data-category="駐車場">駐車場</button>
                 <button class="category-tag" data-category="コンビニ">コンビニ</button>
-                <button class="category-tag" data-category="観光施設">観光施設</button>
+                <button class="category-tag" data-category="観光スポット">観光スポット</button>
                 <button class="category-tag" data-category="駅">駅</button>
-                <button class="category-tag" data-category="トイレ">トイレ</button>
-                <button class="category-tag" data-category="雑貨屋">雑貨屋</button>
             </div>
         </div>
 
@@ -565,9 +563,15 @@
         let map;
         let markers = [];
         let allSpots = [];
-        let placesSpots = [];
         let currentCategory = '';
         let bookmarks = JSON.parse(localStorage.getItem('kumano_bookmarks') || '[]');
+
+        // 世界遺産スポット名リスト (Places APIの結果にバッジを付与)
+        const WORLD_HERITAGE_NAMES = [
+            '熊野本宮大社', '熊野速玉大社', '熊野那智大社',
+            '鬼ヶ城', '獅子巌', '花の窟神社', '松本峠',
+            '熊野古道', '那智の滝', '補陀洛山寺', '神倉神社'
+        ];
 
         // --- タブ切り替え ---
         document.querySelectorAll('.tab-item').forEach(item => {
@@ -614,57 +618,55 @@
 
         async function loadSpots() {
             try {
-                const response = await fetch('/api/spots');
-                allSpots = await response.json();
-                await loadPlacesSpots();
-                displaySpots(getAllSpots());
-            } catch (error) {
-                console.error('スポットデータの読み込みに失敗:', error);
-            }
-        }
+                allSpots = [];
+                const service = new google.maps.places.PlacesService(map);
+                const kumanoCenter = new google.maps.LatLng(33.8895, 136.0997);
 
-        function getAllSpots() {
-            return [...allSpots, ...placesSpots];
-        }
+                const placeTypes = [
+                    { type: 'restaurant', category: '飲食店' },
+                    { type: 'lodging', category: 'ホテル' },
+                    { type: 'parking', category: '駐車場' },
+                    { type: 'convenience_store', category: 'コンビニ' },
+                    { type: 'tourist_attraction', category: '観光スポット' },
+                    { type: 'train_station', category: '駅' }
+                ];
 
-        async function loadPlacesSpots() {
-            const service = new google.maps.places.PlacesService(map);
-            const kumanoCenter = new google.maps.LatLng(33.8895, 136.0997);
-            const placeTypes = [
-                { type: 'restaurant', category: '飲食店' },
-                { type: 'lodging', category: 'ホテル' },
-                { type: 'parking', category: '駐車場' }
-            ];
-            placesSpots = [];
-            let nextId = 10000;
+                let nextId = 1;
+                const seen = new Set();
 
-            for (const pt of placeTypes) {
-                const results = await searchNearby(service, { location: kumanoCenter, radius: 5000, type: pt.type });
-                results.forEach(place => {
-                    const isDuplicate = allSpots.some(s => {
-                        const dist = getDistance(s.lat, s.lng, place.geometry.location.lat(), place.geometry.location.lng());
-                        return dist < 50 && s.name.includes(place.name.substring(0, 4));
+                for (const pt of placeTypes) {
+                    const results = await searchNearby(service, {
+                        location: kumanoCenter,
+                        radius: 5000,
+                        type: pt.type
                     });
-                    if (!isDuplicate) {
-                        placesSpots.push({
+                    results.forEach(place => {
+                        const placeId = place.place_id;
+                        if (seen.has(placeId)) return;
+                        seen.add(placeId);
+
+                        const name = place.name;
+                        const isHeritage = WORLD_HERITAGE_NAMES.some(h => name.includes(h));
+
+                        allSpots.push({
                             id: nextId++,
-                            name: place.name,
+                            place_id: placeId,
+                            name: name,
                             category: pt.category,
                             lat: place.geometry.location.lat(),
                             lng: place.geometry.location.lng(),
                             description: place.vicinity || '',
                             photo_url: (place.photos && place.photos.length > 0) ? place.photos[0].getUrl({ maxWidth: 400 }) : '',
-                            open_time: '',
-                            close_time: '',
-                            recommended_menu: '',
-                            reservation_url: '',
-                            is_world_heritage: false,
-                            _from_places: true,
+                            is_world_heritage: isHeritage,
                             rating: place.rating || null,
                             user_ratings_total: place.user_ratings_total || 0
                         });
-                    }
-                });
+                    });
+                }
+                console.log('Places API loaded:', allSpots.length, 'spots');
+                displaySpots(allSpots);
+            } catch (error) {
+                console.error('スポットデータの読み込みに失敗:', error);
             }
         }
 
@@ -674,14 +676,6 @@
                     resolve(status === google.maps.places.PlacesServiceStatus.OK ? results : []);
                 });
             });
-        }
-
-        function getDistance(lat1, lng1, lat2, lng2) {
-            const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLng = (lng2 - lng1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
         // --- マーカー表示 ---
@@ -713,16 +707,15 @@
             if (isWorldHeritage) return '%F0%9F%8F%9B%EF%B8%8F';
             const icons = {
                 'コンビニ': '%F0%9F%9B%92', 'ホテル': '%F0%9F%8F%A8', '飲食店': '%F0%9F%8D%BD%EF%B8%8F',
-                'トイレ': '%F0%9F%9A%BB', '駐車場': '%F0%9F%85%BF%EF%B8%8F', '雑貨屋': '%F0%9F%9B%8D%EF%B8%8F',
-                '神社': '%E2%9B%A9%EF%B8%8F', '史跡': '%F0%9F%8F%9B%EF%B8%8F', '駅': '%F0%9F%9A%89',
-                '観光施設': '%F0%9F%8F%9E%EF%B8%8F'
+                '駐車場': '%F0%9F%85%BF%EF%B8%8F', '駅': '%F0%9F%9A%89',
+                '観光スポット': '%F0%9F%8F%9E%EF%B8%8F'
             };
             return icons[category] || '%F0%9F%93%8D';
         }
 
         function filterSpots() {
             const term = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = getAllSpots().filter(spot => {
+            const filtered = allSpots.filter(spot => {
                 const matchCat = !currentCategory || spot.category === currentCategory;
                 const matchSearch = !term || spot.name.toLowerCase().includes(term) || (spot.description && spot.description.toLowerCase().includes(term));
                 return matchCat && matchSearch;
@@ -737,9 +730,6 @@
             selectedSpot = spot;
 
             const photo = spot.photo_url;
-            const hasHours = spot.open_time && spot.close_time;
-            const hasMenu = spot.recommended_menu;
-            const hasUrl = spot.reservation_url;
             const isBookmarked = bookmarks.some(b => b.id === spot.id);
 
             let html = '';
@@ -750,7 +740,6 @@
             if (spot.is_world_heritage) html += `<span class="badge-heritage">世界遺産</span>`;
             html += `</h2>`;
             html += `<div class="detail-category">${spot.category}</div>`;
-            if (spot.description) html += `<div class="detail-description">${spot.description}</div>`;
 
             if (spot.rating) {
                 html += `<div class="detail-row">
@@ -761,25 +750,7 @@
                     </div>
                 </div>`;
             }
-            if (hasHours) {
-                html += `<div class="detail-row">
-                    <div class="detail-row-icon">&#128339;</div>
-                    <div class="detail-row-content">
-                        <div class="detail-row-label">営業時間</div>
-                        <div class="detail-row-value">${spot.open_time} - ${spot.close_time}</div>
-                    </div>
-                </div>`;
-            }
-            if (hasMenu) {
-                html += `<div class="detail-row">
-                    <div class="detail-row-icon">&#127860;</div>
-                    <div class="detail-row-content">
-                        <div class="detail-row-label">おすすめ</div>
-                        <div class="detail-row-value">${spot.recommended_menu}</div>
-                    </div>
-                </div>`;
-            }
-            if (spot.description && spot.description.includes('、')) {
+            if (spot.description) {
                 html += `<div class="detail-row">
                     <div class="detail-row-icon">&#128205;</div>
                     <div class="detail-row-content">
@@ -789,9 +760,12 @@
                 </div>`;
             }
 
+            // Google Mapsで開くリンク
+            const mapsUrl = 'https://www.google.com/maps/place/?q=place_id:' + (spot.place_id || '');
+
             html += `<div class="detail-actions">`;
-            if (hasUrl) {
-                html += `<button class="btn-action primary" onclick="window.open('${spot.reservation_url}','_blank')">&#128279; 予約・詳細</button>`;
+            if (spot.place_id) {
+                html += `<button class="btn-action primary" onclick="window.open('${mapsUrl}','_blank')">&#128506; Google Mapsで開く</button>`;
             }
             html += `<button class="btn-action ${isBookmarked ? 'bookmark-active' : 'secondary'}" id="bookmarkBtn" onclick="toggleBookmark(${spot.id})">
                 ${isBookmarked ? '&#128278; 保存済み' : '&#128278; 保存'}
@@ -812,9 +786,8 @@
             if (isWorldHeritage) return '&#127963;&#65039;';
             const icons = {
                 'コンビニ': '&#128722;', 'ホテル': '&#127976;', '飲食店': '&#127869;&#65039;',
-                'トイレ': '&#128699;', '駐車場': '&#127359;&#65039;', '雑貨屋': '&#128717;&#65039;',
-                '神社': '&#9961;&#65039;', '史跡': '&#127963;&#65039;', '駅': '&#128649;',
-                '観光施設': '&#127966;&#65039;'
+                '駐車場': '&#127359;&#65039;', '駅': '&#128649;',
+                '観光スポット': '&#127966;&#65039;'
             };
             return icons[category] || '&#128205;';
         }
@@ -825,7 +798,7 @@
             if (idx >= 0) {
                 bookmarks.splice(idx, 1);
             } else {
-                const spot = getAllSpots().find(s => s.id === spotId);
+                const spot = allSpots.find(s => s.id === spotId);
                 if (spot) bookmarks.push(spot);
             }
             localStorage.setItem('kumano_bookmarks', JSON.stringify(bookmarks));
